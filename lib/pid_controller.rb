@@ -1,18 +1,149 @@
-# we will have a control loop
-# SP    - setpoint, this is the desired position
-# PV(t) - process variable, this is the sensed position, varying over time
-#  e(t) - error, SP - PV
-# CV(t) - control variable: the controller output
-
-# for example, where to set the throttle to maintain 1000 RPM
-# SP - 1000 RPM
-# PV - current RPM
-# CV - throttle position
-
-class PIDController
+# This is an example of the API pattern for a Controller (e.g. thermostat)
+# or a Device (e.g. heater).
+#
+# They each have an input that varies over time which determines their output.
+#
+# A thermostat (Controller) listens for  temperature and tells the heater how
+# high to turn it up (or just on / off).
+#
+# A heater (Device) listens to its control knob and yields heat as an output.
+#
+class Processor
   HZ = 1000
   TICK = Rational(1) / HZ
 
+  attr_reader :input
+
+  def initialize(dt: TICK)
+    @dt = dt
+  end
+
+  def update(input)
+    self.input = input
+    self.output
+  end
+
+  # presumably overwritten by a subclass; probably update some state
+  def input=(val)
+    @input = val
+  end
+
+  # presumably overwritten by a subclass
+  def output
+    @input
+  end
+end
+
+# a Controller's main interface is the update method, which given a measure
+# provides an output
+class Controller
+  HZ = Processor::HZ
+  TICK = Processor::TICK
+
+  attr_accessor :setpoint, :dt
+  attr_reader :measure, :error, :last_error, :sum_error
+
+  def initialize(setpoint, dt: TICK)
+    @setpoint, @dt, @measure = setpoint, dt, 0.0
+    @error, @last_error, @sum_error = 0.0, 0.0, 0.0
+  end
+
+  # this is the main interface for a controller
+  # provide a measure, and get a new setting in response
+  def update(measure)
+    self.measure = measure
+    self.output
+  end
+
+  def measure=(val)
+    @measure = val
+    @last_error = @error
+    @error = @setpoint - @measure
+    if @error * @last_error <= 0  # zero crossing; reset the accumulated error
+      @sum_error = @error
+    else
+      @sum_error += @error
+    end
+  end
+
+  # the output will depend on the @measure in some way
+  def output
+    @error
+  end
+
+  def to_s
+    [format("Setpoint: %.3f\tMeasure: %.3f\tdt: %s",
+            @setpoint, @measure, @dt),
+     format("Error: %+.3f\tLast: %+.3f\tSum: %+.3f",
+            @error, @last_error, @sum_error),
+    ].join("\n")
+  end
+end
+
+# input is the current ambient temp (monitored for safety cutoff)
+# output is watts
+class Heater < Processor
+  # convert electricity into thermal output
+  EFFICIENCY = 0.95
+
+  attr_accessor :cutoff
+  attr_reader :watts
+
+  def initialize(watts, dt: TICK)
+    super(dt: dt)
+    @watts = watts
+    @cutoff = 35 # degrees C
+  end
+
+  # output is all or none
+  def output
+    @input < @cutoff ? (@watts * EFFICIENCY) : 0
+  end
+end
+
+class Cooler < Heater
+  # not nearly as efficient as heaters in turning electrons into therms
+  EFFICIENCY = 0.35
+
+  def initialize(watts, dt: TICK)
+    super
+    @cutoff = 10 # degrees C
+  end
+
+  # output is all or none
+  def output
+    @input > @cutoff ? (@watts * EFFICIENCY) : 0
+  end
+end
+
+class Thermostat < Controller
+  # true or false; can drive a Heater or a Cooler
+  def output
+    @error > 0
+  end
+end
+
+# now consider e.g.
+# h = Heater.new(1000)
+# ht = Thermostat.new(20)
+# c = Cooler.new(1000)
+# ct = Thermostat.new(25)
+# temp = 26.4
+# heating_watts = h.update(ht.update(temp))
+# cooling_watts = c.update(ct.update(temp))
+# etc
+
+
+# Track:
+# * current error (setpoint - measure)
+# * accumulated error
+# * last error
+# In order to calculate:
+# * Proportion (current error)
+# * Integral   (accumulated error)
+# * Derivative (error slope, last_error)
+#
+class PIDController < Controller
   # Ziegler-Nichols method for tuning PID gain knobs
   ZN = {
     #            Kp     Ti     Td     Ki     Kd
@@ -27,7 +158,7 @@ class PIDController
     'none' => [0.200, 0.500, 0.333, 0.400, 0.066],
   }
 
-  # ultimate gain, oscillation
+  # ku = ultimate gain, tu = oscillation period
   def self.tune(type, ku, tu)
     record = ZN[type.downcase] || ZN[type.upcase] || ZN.fetch(type)
     kp, ti, td, ki, kd = *record
@@ -39,15 +170,11 @@ class PIDController
     { kp: kp, ti: ti, td: td, ki: ki, kd: kd }
   end
 
-  attr_accessor :kp, :ki, :kd, :dt, :setpoint,
-                :p_range, :i_range, :d_range, :o_range
-  attr_reader :measure, :error, :last_error, :sum_error
+  attr_accessor :kp, :ki, :kd, :p_range, :i_range, :d_range, :o_range
+  attr_reader :error, :last_error, :sum_error
 
   def initialize(setpoint, dt: TICK)
-    @setpoint, @dt, @measure = setpoint, dt, 0.0
-
-    # track error over time for integral and derivative
-    @error, @last_error, @sum_error = 0.0, 0.0, 0.0
+    super(setpoint, dt: dt)
 
     # gain / multipliers for PID; tunables
     @kp, @ki, @kd = 1.0, 1.0, 1.0
@@ -61,23 +188,6 @@ class PIDController
     yield self if block_given?
   end
 
-  def update(measure)
-    self.measure = measure
-    self.output
-  end
-
-  def measure=(val)
-    @measure = val
-    @last_error = @error
-    @error = @setpoint - @measure
-    dt_error = error * dt
-    if @error * @last_error > 0
-      @sum_error += dt_error
-    else # zero crossing; reset the accumulated error
-      @sum_error = dt_error
-    end
-  end
-
   def output
     (self.proportion +
      self.integral +
@@ -89,7 +199,7 @@ class PIDController
   end
 
   def integral
-    (@ki * @sum_error).clamp(@i_range.begin, @i_range.end)
+    (@ki * @sum_error * @dt).clamp(@i_range.begin, @i_range.end)
   end
 
   def derivative
@@ -97,14 +207,11 @@ class PIDController
   end
 
   def to_s
-    [format("Setpoint: %.3f  Measure: %.3f",
-            @setpoint, @measure),
-     format("Error: %+.3f\tLast: %+.3f\tSum: %+.3f",
-            @error, @last_error, @sum_error),
-     format(" Gain:\t%.3f\t%.3f\t%.3f",
-            @kp, @ki, @kd),
-     format("  PID:\t%+.3f\t%+.3f\t%+.3f",
-            self.proportion, self.integral, self.derivative),
-    ].join("\n")
+    super +
+      [format(" Gain:\t%.3f\t%.3f\t%.3f",
+              @kp, @ki, @kd),
+       format("  PID:\t%+.3f\t%+.3f\t%+.3f\t= %.5f",
+              self.proportion, self.integral, self.derivative, self.output),
+      ].join("\n")
   end
 end
