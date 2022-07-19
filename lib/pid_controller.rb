@@ -1,125 +1,104 @@
-# This is an example of the API pattern for a Controller (e.g. thermostat)
-# or a Device (e.g. heater).
-#
-# They each have an input that varies over time which determines their output.
-#
+# There is a pattern for how both Controllers (e.g. thermostat) and Devices
+#   (e.g. heater) operate.
+# They each have an _input_ varying over time which determines the _output_.
 # A thermostat (Controller) listens for  temperature and tells the heater how
-# high to turn it up (or just on / off).
+# high to turn it up (or just on / off).  A heater (Device) listens to its
+# control knob and yields heat as an output.
 #
-# A heater (Device) listens to its control knob and yields heat as an output.
+# We capture this pattern with a single method: _update_.  It accepts the
+# latest input and provides an _output_ based on the input. When the input
+# is read in, perhaps some internal state is changed on
+# the processor which will affect the _output_.
 #
-class Processor
-  HZ = 1000
-  TICK = Rational(1) / HZ
+# Any class which mixes in Processor can define its own _input=_ method,
+# which may update any additional state beyond the ivar @input.  Any such
+# class must define an _output_ method.
+#
+module Processor
+  attr_accessor :input
 
-  attr_reader :input
-
-  def initialize(dt: TICK)
-    @dt = dt
-  end
-
-  def update(input)
-    self.input = input
+  def update(val)
+    self.input = val
     self.output
-  end
-
-  # presumably overwritten by a subclass; probably update some state
-  def input=(val)
-    @input = val
-  end
-
-  # presumably overwritten by a subclass
-  def output
-    @input
   end
 end
 
-# a Controller's main interface is the update method, which given a measure
-# provides an output
-class Controller
-  HZ = Processor::HZ
-  TICK = Processor::TICK
+# A Device is like a heater.  It has a control knob, maybe on/off or perhaps
+# a variable control.  Its output (maybe on/off) depends on the control knob.
+class Device
+  include Processor
 
-  attr_accessor :setpoint, :dt
-  attr_reader :measure, :error, :last_error, :sum_error
-
-  def initialize(setpoint, dt: TICK)
-    @setpoint, @dt, @measure = setpoint, dt, 0.0
-    @error, @last_error, @sum_error = 0.0, 0.0, 0.0
+  def initialize
+    @input = 0.0
   end
 
-  # this is the main interface for a controller
-  # provide a measure, and get a new setting in response
-  def update(measure)
-    self.measure = measure
-    self.output
-  end
-
-  def measure=(val)
-    @measure = val
-    @last_error = @error
-    @error = @setpoint - @measure
-    if @error * @last_error <= 0  # zero crossing; reset the accumulated error
-      @sum_error = @error
-    else
-      @sum_error += @error
-    end
-  end
-
-  # the output will depend on the @measure in some way
   def output
-    @error
+    @input # do nothing by default
   end
 
   def to_s
-    [format("Setpoint: %.3f\tMeasure: %.3f\tdt: %s",
-            @setpoint, @measure, @dt),
-     format("Error: %+.3f\tLast: %+.3f\tSum: %+.3f",
-            @error, @last_error, @sum_error),
-    ].join("\n")
+    format("Knob: %.3f", @input)
   end
 end
 
-# input is the current ambient temp (monitored for safety cutoff)
-# output is watts
-class Heater < Processor
+# Alright, fine, let's make a Heater
+# Input is the control knob (turned far enough to on, else off)
+# Output is watts
+class Heater < Device
   # convert electricity into thermal output
-  EFFICIENCY = 0.95
+  EFFICIENCY = 0.999
 
-  attr_accessor :cutoff
   attr_reader :watts
 
-  def initialize(watts, dt: TICK)
-    super(dt: dt)
+  def initialize(watts, threshold: 0)
+    super
     @watts = watts
-    @cutoff = 35 # degrees C
+    @threshold = threshold
   end
 
   # output is all or none
   def output
-    @input < @cutoff ? (@watts * EFFICIENCY) : 0
+    @input > @threshold ? (@watts * self.class::EFFICIENCY) : 0
+  end
+
+  def to_s
+    format("Power: %d W\tKnob: %.1f\tThermal: %.1f W",
+           @watts, @input, self.output)
   end
 end
 
 class Cooler < Heater
-  # not nearly as efficient as heaters in turning electrons into therms
+  # not nearly as efficient as a heater at turning electrons into therms
   EFFICIENCY = 0.35
+end
 
-  def initialize(watts, dt: TICK)
-    super
-    @cutoff = 10 # degrees C
+# A Controller is like a thermostat.  It has a setpoint, and it reads a
+# measurement from the environment, and it adjusts its output to try to make
+# the measurement match the setpoint.
+class Controller
+  include Processor
+
+  attr_accessor :setpoint
+
+  def initialize(setpoint)
+    @setpoint, @input = setpoint, 0.0
   end
 
-  # output is all or none
+  # just output the error
   def output
-    @input > @cutoff ? (@watts * EFFICIENCY) : 0
+    @setpoint - @input
+  end
+
+  def to_s
+    format("Setpoint: %.3f\tMeasure: %.3f", @setpoint, @input)
   end
 end
 
 class Thermostat < Controller
   # true or false; can drive a Heater or a Cooler
+  # true means input below setpoint; false otherwise
   def output
-    @error > 0
+    @setpoint - @input > 0
   end
 end
 
@@ -129,36 +108,70 @@ end
 # c = Cooler.new(1000)
 # ct = Thermostat.new(25)
 # temp = 26.4
-# heating_watts = h.update(ht.update(temp))
-# cooling_watts = c.update(ct.update(temp))
+# heat_knob = ht.update(temp) ? 1 : 0
+# heating_watts = h.update(heat_knob)
+# cool_knob = ct.update(temp) ? 0 : 1
+# cooling_watts = c.update(cool_knob)
 # etc
 
+# A StatefulController tracks its error over time: current, last, accumulated
+#
+class StatefulController < Controller
+  attr_reader :error, :last_error, :sum_error
 
-# Track:
-# * current error (setpoint - measure)
-# * accumulated error
-# * last error
-# In order to calculate:
+  def initialize(setpoint)
+    super
+    @error, @last_error, @sum_error = 0.0, 0.0, 0.0
+  end
+
+  # update @error, @last_error, and @sum_error
+  def input=(val)
+    @input = val
+    @last_error = @error
+    @error = @setpoint - @input
+    if @error * @last_error <= 0  # zero crossing; reset the accumulated error
+      @sum_error = @error
+    else
+      @sum_error += @error
+    end
+  end
+
+  def to_s
+    [super,
+     format("Error: %+.3f\tLast: %+.3f\tSum: %+.3f",
+            @error, @last_error, @sum_error),
+    ].join("\n")
+  end
+end
+
+# A PIDController is a StatefulController that calculates
 # * Proportion (current error)
 # * Integral   (accumulated error)
 # * Derivative (error slope, last_error)
+# The sum of these terms is the output
 #
-class PIDController < Controller
+class PIDController < StatefulController
+  HZ = 1000
+  TICK = Rational(1) / HZ
+
   # Ziegler-Nichols method for tuning PID gain knobs
+  # https://en.wikipedia.org/wiki/Ziegler%E2%80%93Nichols_method
   ZN = {
-    #            Kp     Ti     Td     Ki     Kd
-    #     Var:   Ku     Tu     Tu    Ku/Tu  Ku*Tu
-    'P'  =>   [0.500],
-    'PI' =>   [0.450, 0.800,   nil, 0.540],
-    'PD' =>   [0.800,   nil, 0.125,   nil, 0.100],
-    'PID' =>  [0.600, 0.500, 0.125, 1.200, 0.075],
-    'PIR' =>  [0.700, 0.400, 0.150, 1.750, 0.105],
-    # less overshoot than standard PID below
-    'some' => [0.333, 0.500, 0.333, 0.666, 0.111],
-    'none' => [0.200, 0.500, 0.333, 0.400, 0.066],
+    #           Kp     Ti    Td     Ki     Kd
+    #     Var:  Ku     Tu    Tu    Ku/Tu  Ku*Tu
+    'P'    => [1/2r],
+    'PI'   => [9/20r, 4/5r,   nil, 27/50r],
+    'PD'   => [ 4/5r,  nil,  1/8r,  nil, 1/10r],
+    'PID'  => [ 3/5r, 1/2r,  1/8r, 6/5r, 3/40r],
+    'PIR'  => [7/10r, 2/5r, 3/20r, 7/4r, 21/200r],
+    # less overshoot than standard PID
+    'some' => [ 1/3r, 1/2r,  1/3r, 2/3r, 1/11r],
+    'none' => [ 1/5r, 1/2r,  1/3r, 2/5r, 2/30r],
   }
 
-  # ku = ultimate gain, tu = oscillation period
+  # _ku_ = ultimate gain, _tu_ = oscillation period
+  # output includes ti and td, which are not necessary
+  # typically kp, ki, and kd are used
   def self.tune(type, ku, tu)
     record = ZN[type.downcase] || ZN[type.upcase] || ZN.fetch(type)
     kp, ti, td, ki, kd = *record
@@ -170,11 +183,12 @@ class PIDController < Controller
     { kp: kp, ti: ti, td: td, ki: ki, kd: kd }
   end
 
+  attr_reader :dt
   attr_accessor :kp, :ki, :kd, :p_range, :i_range, :d_range, :o_range
-  attr_reader :error, :last_error, :sum_error
 
   def initialize(setpoint, dt: TICK)
-    super(setpoint, dt: dt)
+    super(setpoint)
+    @dt = dt
 
     # gain / multipliers for PID; tunables
     @kp, @ki, @kd = 1.0, 1.0, 1.0
