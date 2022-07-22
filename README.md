@@ -52,7 +52,7 @@ to make sense.
 Our control loop is composed of the 3 concepts above:
 
 ```
-CONTROLLER  ==>  DEVICE
+CONTROLLER ----> DEVICE
         ^         |
         |         |
         |         V
@@ -215,6 +215,10 @@ class Thermostat < Controller
 end
 ```
 
+Notice, the thermostat essentially answers the question: *is it hot enough?*
+(or: *is it too cold?*).  You can run it either or both ways, but notice that
+you can simply pick one orientation and remain logically consistent.
+
 Now consider:
 
 ```ruby
@@ -237,15 +241,12 @@ temp = 24.9
 
 ```
 
-Notice, the thermostat essentially answers the question: *is it hot enough?*
-(or: *is it too cold?*).  You can run it either or both ways, but notice that
-you can simply pick one orientation and remain logically consistent.  So the
-**heat knob** goes to 1 when its thermostat goes *below* setpoint.
+So the **heat knob** goes to 1 when its thermostat goes *below* setpoint.
 The **cool knob** goes to 1 when its thermostat goes *above* setpoint.
 
 # Finale
 
 If you've made it this far, congratulations!  For further reading:
 
-* [lib/pid_controller.rb](lib/pid_controller.rb#L155)
-* [test/pid_controller.rb](test/pid_controller.rb)
+* [lib/device_control.rb](lib/device_control.rb#L155)
+* [test/device_control.rb](test/device_control.rb)

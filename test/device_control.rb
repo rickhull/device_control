@@ -1,4 +1,4 @@
-require 'pid_controller'
+require 'device_control'
 require 'minitest/autorun'
 
 # create a basic class that includes Updateable as a Mixin
