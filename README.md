@@ -242,3 +242,10 @@ Notice, the thermostat essentially answers the question: *is it hot enough?*
 you can simply pick one orientation and remain logically consistent.  So the
 heat knob goes to 1 when its thermostat goes below setpoint.  The cool knob
 goes to 1 when its thermostat goes above setpoint.
+
+# Finale
+
+If you've made it this far, congratulations!  For further reading:
+
+* [lib/pid_controller.rb](lib/pid_controller.rb#L155)
+* [test/pid_controller.rb](test/pid_controller.rb)
