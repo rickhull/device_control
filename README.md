@@ -24,7 +24,7 @@ towards the desired temperature.
 ## Device
 
 I'm not sure about the actual nomenclature from a very rich field of study,
-*control theory*, but I'm using the term "device" to describe what it is the
+*control theory*, but I'm using the term "device" to describe that which the
 controller is controlling.  So a heater or a refrigerator may be the device,
 or the throttle on an engine, or a broomstick balanced on a pencil eraser.
 
