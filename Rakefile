@@ -13,7 +13,7 @@ begin
   require 'buildar'
 
   Buildar.new do |b|
-    b.gemspec_file = 'pid_controller_ng.gemspec'
+    b.gemspec_file = 'device_control.gemspec'
     b.version_file = 'VERSION'
     b.use_git = true
   end

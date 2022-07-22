@@ -1,4 +1,4 @@
-[![Test Status](https://github.com/rickhull/pid_controller_ng/actions/workflows/test.yaml/badge.svg)](https://github.com/rickhull/pid_controller_ng/actions/workflows/test.yaml)
+[![Test Status](https://github.com/rickhull/device_control/actions/workflows/test.yaml/badge.svg)](https://github.com/rickhull/device_control/actions/workflows/test.yaml)
 
 # Rationale
 
