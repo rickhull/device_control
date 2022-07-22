@@ -67,7 +67,7 @@ an environmental output.  The environment accepts the new output and produces
 a new measure for the controller.
 
 ```ruby
-module Processor
+module Updateable
   def update(val)
     self.input = val
     self.output
@@ -77,7 +77,7 @@ end
 
 Notice, this is a module, not a class.  This module is intended to be mixed in
 to a class in order provide (and guarantee) the pattern of behavior.  Any
-class which wants to mix in Processor should thus, at minimum, define:
+class which wants to mix in Updateable should thus, at minimum, define:
 
 * `initialize`
 * `input=`
@@ -90,7 +90,7 @@ touch `@input` if a different ivar name is preferred.
 
 ```ruby
 class Device
-  include Processor
+  include Updateable
 
   attr_reader :knob
 
@@ -113,7 +113,7 @@ class Device
 end
 ```
 
-We've named our class `Device`, mixed in `Processor`, and we've named our input
+We've named our class `Device`, mixed in `Updateable`, and we've named our input
 `knob`.  In general, we will operate only on Floats for inputs and outputs,
 though perhaps interesting things can be done outside this limitation.
 
@@ -175,7 +175,7 @@ sophisticated Heater and Cooler models as well ;)
 
 ```ruby
 class Controller
-  include Processor
+  include Updateable
 
   attr_reader :measure
   attr_accessor :setpoint

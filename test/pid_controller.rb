@@ -1,9 +1,9 @@
 require 'pid_controller'
 require 'minitest/autorun'
 
-# create a basic class that includes Processor as a Mixin
+# create a basic class that includes Updateable as a Mixin
 class Doubler
-  include Processor
+  include Updateable
 
   attr_accessor :input
 
@@ -17,7 +17,7 @@ class Doubler
   end
 end
 
-describe Processor do
+describe Updateable do
   describe "a mixin that provides the _update_ pattern" do
     before do
       @o = Doubler.new
@@ -34,7 +34,7 @@ describe Processor do
 
     it "requires an _output_ method" do
       k = Class.new(Object) do
-        include Processor
+        include Updateable
       end
       o = k.new
       expect { o.update(45) }.must_raise NoMethodError
@@ -55,7 +55,7 @@ describe Device do
     expect(@device.to_s).must_be_kind_of String
   end
 
-  it "has an _update_ method from Processor" do
+  it "has an _update_ method from Updateable" do
     expect(@device.update(2.34)).must_be_kind_of Float
   end
 end
@@ -76,7 +76,7 @@ describe Heater do
     expect(@h.to_s).must_be_kind_of String
   end
 
-  it "has _update_ from Processor" do
+  it "has _update_ from Updateable" do
     expect(@h.knob).must_equal 0
     expect(@h.output).must_equal 0
     output = @h.update(1)
@@ -101,7 +101,7 @@ describe Controller do
     expect(@c.to_s).must_be_kind_of String
   end
 
-  it "has an _update_ method from Processor" do
+  it "has an _update_ method from Updateable" do
     expect(@c.update(499)).must_equal 1.0
   end
 end

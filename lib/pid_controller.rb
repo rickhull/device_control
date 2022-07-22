@@ -10,10 +10,10 @@
 # is read in, perhaps some internal state is changed on
 # the processor which will affect the _output_.
 #
-# Any class which mixes in Processor can define its own _input=_ method,
+# Any class which mixes in Updateable can define its own _input=_ method,
 # which may update any ivars.  Any such class must define an _output_ method.
 #
-module Processor
+module Updateable
   def update(val)
     self.input = val
     self.output
@@ -23,7 +23,7 @@ end
 # A Device is like a heater.  It has a control knob, maybe on/off or perhaps
 # a variable control.  Its output (maybe on/off) depends on the control knob.
 class Device
-  include Processor
+  include Updateable
 
   attr_reader :knob
 
@@ -80,7 +80,7 @@ end
 # measurement from the environment, and it adjusts its output to try to make
 # the measurement match the setpoint.
 class Controller
-  include Processor
+  include Updateable
 
   attr_reader :measure
   attr_accessor :setpoint
