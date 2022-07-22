@@ -77,7 +77,7 @@ end
 
 Notice, this is a module, not a class.  This module is intended to be mixed in
 to a class in order provide (and guarantee) the pattern of behavior.  Any
-class which wants to mix in Updateable should thus, at minimum, define:
+class which wants to mix in `Updateable` should thus, at minimum, define:
 
 * `initialize`
 * `input=`
@@ -240,8 +240,8 @@ temp = 24.9
 Notice, the thermostat essentially answers the question: *is it hot enough?*
 (or: *is it too cold?*).  You can run it either or both ways, but notice that
 you can simply pick one orientation and remain logically consistent.  So the
-heat knob goes to 1 when its thermostat goes below setpoint.  The cool knob
-goes to 1 when its thermostat goes above setpoint.
+**heat knob** goes to 1 when its thermostat goes *below* setpoint.
+The **cool knob** goes to 1 when its thermostat goes *above* setpoint.
 
 # Finale
 

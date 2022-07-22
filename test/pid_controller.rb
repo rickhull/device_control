@@ -2,12 +2,12 @@ require 'pid_controller'
 require 'minitest/autorun'
 
 # create a basic class that includes Updateable as a Mixin
+# the class should define #initialize, #input= and #output at minimum
 class Doubler
   include Updateable
 
   attr_accessor :input
 
-  # the class should define #initialize and #output at minimum
   def initialize
     @input = 0.0
   end
