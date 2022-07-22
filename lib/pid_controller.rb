@@ -11,12 +11,9 @@
 # the processor which will affect the _output_.
 #
 # Any class which mixes in Processor can define its own _input=_ method,
-# which may update any additional state beyond the ivar @input.  Any such
-# class must define an _output_ method.
+# which may update any ivars.  Any such class must define an _output_ method.
 #
 module Processor
-  attr_accessor :input
-
   def update(val)
     self.input = val
     self.output
@@ -28,16 +25,23 @@ end
 class Device
   include Processor
 
+  attr_reader :knob
+
   def initialize
-    @input = 0.0
+    @knob = 0.0
   end
 
+  def input=(val)
+    @knob = val.to_f
+  end
+  alias_method :knob=, :input=
+
   def output
-    @input # do nothing by default
+    @knob # do nothing by default
   end
 
   def to_s
-    format("Knob: %.3f", @input)
+    format("Knob: %.3f\tOutput: %.3f", @knob, self.output)
   end
 end
 
@@ -58,12 +62,12 @@ class Heater < Device
 
   # output is all or none
   def output
-    @input > @threshold ? (@watts * self.class::EFFICIENCY) : 0
+    @knob > @threshold ? (@watts * self.class::EFFICIENCY) : 0
   end
 
   def to_s
     format("Power: %d W\tKnob: %.1f\tThermal: %.1f W",
-           @watts, @input, self.output)
+           @watts, @knob, self.output)
   end
 end
 
@@ -78,19 +82,25 @@ end
 class Controller
   include Processor
 
+  attr_reader :measure
   attr_accessor :setpoint
 
   def initialize(setpoint)
-    @setpoint, @input = setpoint, 0.0
+    @setpoint, @measure = setpoint, 0.0
   end
+
+  def input=(val)
+    @measure = val.to_f
+  end
+  alias_method :measure=, :input=
 
   # just output the error
   def output
-    @setpoint - @input
+    @setpoint - @measure
   end
 
   def to_s
-    format("Setpoint: %.3f\tMeasure: %.3f", @setpoint, @input)
+    format("Setpoint: %.3f\tMeasure: %.3f", @setpoint, @measure)
   end
 end
 
@@ -98,7 +108,33 @@ class Thermostat < Controller
   # true or false; can drive a Heater or a Cooler
   # true means input below setpoint; false otherwise
   def output
-    @setpoint - @input > 0
+    @setpoint - @measure > 0
+  end
+end
+
+class Flexstat < Thermostat
+  def self.cold_val(hot_val)
+    case hot_val
+    when true, false
+      !hot_val
+    when 0,1
+      hot_val == 0 ? 1 : 0
+    when Numeric
+      0
+    when :on, :off
+      hot_val == :on ? :off : :on
+    else
+      raise "#{hot_val.inspect} not recognized"
+    end
+  end
+
+  def initalize(hot_val: false, cold_val: nil)
+    @hot_val = hot_val
+    @cold_val = cold_val.nil? ? self.class.cold_val(hot_val) : cold_val
+  end
+
+  def output
+    super ? @cold_val : @hot_val
   end
 end
 
@@ -131,9 +167,9 @@ class StatefulController < Controller
 
   # update @error, @last_error, and @sum_error
   def input=(val)
-    @input = val
+    @measure = val
     @last_error = @error
-    @error = @setpoint - @input
+    @error = @setpoint - @measure
     if @error * @last_error <= 0  # zero crossing; reset the accumulated error
       @sum_error = @error * @dt
     else

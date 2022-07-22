@@ -5,6 +5,8 @@ require 'minitest/autorun'
 class Doubler
   include Processor
 
+  attr_accessor :input
+
   # the class should define #initialize and #output at minimum
   def initialize
     @input = 0.0
@@ -19,13 +21,6 @@ describe Processor do
   describe "a mixin that provides the _update_ pattern" do
     before do
       @o = Doubler.new
-    end
-
-    it "provides an accessor for _input_" do
-      expect(@o.input).must_equal 0.0
-
-      @o.input = 45
-      expect(@o.input).must_equal 45
     end
 
     it "has an _update_ method that accepts an _input_ and returns _output_" do
@@ -70,10 +65,10 @@ describe Heater do
     @h = Heater.new(1000)
   end
 
-  it "has an _output_ when _input_ is greater than zero" do
-    expect(@h.input).must_equal 0
+  it "has an _output_ when _knob_ is greater than zero" do
+    expect(@h.knob).must_equal 0
     expect(@h.output).must_equal 0
-    @h.input = 1
+    @h.knob = 1
     expect(@h.output).must_be :>, 0
   end
 
@@ -82,11 +77,11 @@ describe Heater do
   end
 
   it "has _update_ from Processor" do
-    expect(@h.input).must_equal 0
+    expect(@h.knob).must_equal 0
     expect(@h.output).must_equal 0
     output = @h.update(1)
     expect(output).must_be :>, 0
-    expect(@h.input).must_equal 1
+    expect(@h.knob).must_equal 1
     expect(@h.output).must_equal output
   end
 end
@@ -136,14 +131,14 @@ describe StatefulController do
 
     output = sc.update 50
     expect(sc.output).must_equal output
-    expect(sc.input).must_equal 50
+    expect(sc.measure).must_equal 50
     expect(sc.error).must_be_within_epsilon 50.0
     expect(sc.last_error).must_equal 0.0
     expect(sc.sum_error).must_be_within_epsilon(50.0 * sc.dt)
 
     output = sc.update 75
     expect(sc.output).must_equal output
-    expect(sc.input).must_equal 75
+    expect(sc.measure).must_equal 75
     expect(sc.error).must_be_within_epsilon 25.0
     expect(sc.last_error).must_be_within_epsilon 50.0
     expect(sc.sum_error).must_be_within_epsilon(75.0 * sc.dt)
