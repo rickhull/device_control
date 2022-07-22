@@ -113,7 +113,7 @@ class Device
 end
 ```
 
-We've named our class Device, mixed in Processor, and we've name our input
+We've named our class `Device`, mixed in `Processor`, and we've named our input
 `knob`.  In general, we will operate only on Floats for inputs and outputs,
 though perhaps interesting things can be done outside this limitation.
 
@@ -149,13 +149,14 @@ end
 ```
 
 Starting with a generic device, we'll add `@watts` for output, and we'll also
-allow a configurable threshold for the knob -- at what point does the knob
-turn to on?  By default, anything above 0.  BTW, this is a crude model, as
-`@watts` sort of represents the input energy, and we are representing its
-output as "the amout of heat that 1000 watts (or w/e) puts out".  Since
-electric devices waste power by shedding heat, electric heaters are very
-efficient by definition.  It's not difficult to dump all your power into heat;
-just use a big resistor.
+allow a configurable threshold for the knob -- *at what point does the knob
+turn to on?*  By default, anything above 0.
+
+BTW, this is a crude model, as `@watts` sort of represents the input energy,
+and we are representing its output as "the amout of heat that 1000 watts
+(or whatever) puts out".  Since electric devices waste power by shedding heat,
+electric heaters are very efficient by definition.  It's not difficult to dump
+all your power into heat; just use a big resistor.
 
 #### Cooler
 
@@ -236,8 +237,8 @@ temp = 24.9
 
 ```
 
-Notice, the thermostat basically answers the question: is it hot enough? (or:
-is it too cold?).  You can run it either or both ways, but notice that you
-can just pick one way and be logically consistent.  So the heat knob goes to
-1 when its thermostat goes below setpoint.  The cool knob goes to 1 when
-its thermostat goes above setpoint.
+Notice, the thermostat essentially answers the question: *is it hot enough?*
+(or: *is it too cold?*).  You can run it either or both ways, but notice that
+you can simply pick one orientation and remain logically consistent.  So the
+heat knob goes to 1 when its thermostat goes below setpoint.  The cool knob
+goes to 1 when its thermostat goes above setpoint.
