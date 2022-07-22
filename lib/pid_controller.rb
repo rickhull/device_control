@@ -51,7 +51,7 @@ class Heater < Device
   attr_reader :watts
 
   def initialize(watts, threshold: 0)
-    super
+    super()
     @watts = watts
     @threshold = threshold
   end
@@ -117,10 +117,15 @@ end
 # A StatefulController tracks its error over time: current, last, accumulated
 #
 class StatefulController < Controller
+  HZ = 1000
+  TICK = Rational(1) / HZ
+
+  attr_accessor :dt
   attr_reader :error, :last_error, :sum_error
 
-  def initialize(setpoint)
-    super
+  def initialize(setpoint, dt: TICK)
+    super(setpoint)
+    @dt = dt
     @error, @last_error, @sum_error = 0.0, 0.0, 0.0
   end
 
@@ -130,9 +135,9 @@ class StatefulController < Controller
     @last_error = @error
     @error = @setpoint - @input
     if @error * @last_error <= 0  # zero crossing; reset the accumulated error
-      @sum_error = @error
+      @sum_error = @error * @dt
     else
-      @sum_error += @error
+      @sum_error += @error * @dt
     end
   end
 
@@ -151,9 +156,6 @@ end
 # The sum of these terms is the output
 #
 class PIDController < StatefulController
-  HZ = 1000
-  TICK = Rational(1) / HZ
-
   # Ziegler-Nichols method for tuning PID gain knobs
   # https://en.wikipedia.org/wiki/Ziegler%E2%80%93Nichols_method
   ZN = {
@@ -183,12 +185,10 @@ class PIDController < StatefulController
     { kp: kp, ti: ti, td: td, ki: ki, kd: kd }
   end
 
-  attr_reader :dt
   attr_accessor :kp, :ki, :kd, :p_range, :i_range, :d_range, :o_range
 
   def initialize(setpoint, dt: TICK)
-    super(setpoint)
-    @dt = dt
+    super
 
     # gain / multipliers for PID; tunables
     @kp, @ki, @kd = 1.0, 1.0, 1.0
@@ -213,7 +213,7 @@ class PIDController < StatefulController
   end
 
   def integral
-    (@ki * @sum_error * @dt).clamp(@i_range.begin, @i_range.end)
+    (@ki * @sum_error).clamp(@i_range.begin, @i_range.end)
   end
 
   def derivative

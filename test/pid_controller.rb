@@ -65,6 +65,32 @@ describe Device do
   end
 end
 
+describe Heater do
+  before do
+    @h = Heater.new(1000)
+  end
+
+  it "has an _output_ when _input_ is greater than zero" do
+    expect(@h.input).must_equal 0
+    expect(@h.output).must_equal 0
+    @h.input = 1
+    expect(@h.output).must_be :>, 0
+  end
+
+  it "has a string representation" do
+    expect(@h.to_s).must_be_kind_of String
+  end
+
+  it "has _update_ from Processor" do
+    expect(@h.input).must_equal 0
+    expect(@h.output).must_equal 0
+    output = @h.update(1)
+    expect(output).must_be :>, 0
+    expect(@h.input).must_equal 1
+    expect(@h.output).must_equal output
+  end
+end
+
 describe Controller do
   before do
     @sp = 500
@@ -85,6 +111,22 @@ describe Controller do
   end
 end
 
+describe Thermostat do
+  before do
+    @t = Thermostat.new 25
+  end
+
+  it "outputs true when it's too cold; when measure < setpoint" do
+    expect(@t.update 20).must_equal true
+    expect(@t.update 30).must_equal false
+  end
+
+  it "outputs false when it's too hot; when measure > setpoint" do
+    expect(@t.update 30).must_equal false
+    expect(@t.update 20).must_equal true
+  end
+end
+
 describe StatefulController do
   it "tracks error, last_error, sum_error" do
     sc = StatefulController.new(100)
@@ -97,24 +139,24 @@ describe StatefulController do
     expect(sc.input).must_equal 50
     expect(sc.error).must_be_within_epsilon 50.0
     expect(sc.last_error).must_equal 0.0
-    expect(sc.sum_error).must_be_within_epsilon 50.0
+    expect(sc.sum_error).must_be_within_epsilon(50.0 * sc.dt)
 
     output = sc.update 75
     expect(sc.output).must_equal output
     expect(sc.input).must_equal 75
     expect(sc.error).must_be_within_epsilon 25.0
     expect(sc.last_error).must_be_within_epsilon 50.0
-    expect(sc.sum_error).must_be_within_epsilon 75.0
+    expect(sc.sum_error).must_be_within_epsilon(75.0 * sc.dt)
   end
 
   it "resets sum_error after crossing setpoint" do
     sc = StatefulController.new(100)
     sc.update 50
     sc.update 75
-    expect(sc.sum_error).must_be_within_epsilon 75.0
+    expect(sc.sum_error).must_be_within_epsilon(75.0 * sc.dt)
     sc.update 125
     expect(sc.error).must_equal(-25.0)
-    expect(sc.sum_error).must_equal sc.error
+    expect(sc.sum_error).must_equal(sc.error * sc.dt)
   end
 end
 
