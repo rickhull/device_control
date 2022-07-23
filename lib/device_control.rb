@@ -272,20 +272,16 @@ module DeviceControl
 
     def initialize(max_step:)
       @max_step = max_step
-      @input = 0.0
+      @val = 0.0
     end
 
     def input=(val)
-      diff = val - @input
-      if diff.abs > @max_step
-        @input += @max_step * diff / diff.abs
-      else
-        @input = val
-      end
+      diff = val - @val
+      @val += diff.clamp(-1 * @max_step, @max_step)
     end
 
     def output
-      @input
+      @val
     end
   end
 end
