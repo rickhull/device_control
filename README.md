@@ -61,10 +61,14 @@ CONTROLLER ----> DEVICE
 
 ### A Pattern
 
-Each component accepts an input and yields an output.  Controllers accept
-a measure and yield a control value.  Devices accept a control value and yield
-an environmental output.  The environment accepts the new output and produces
-a new measure for the controller.
+Each component accepts an input and yields an output.  **Controllers** accept
+a measure and yield a control value.  **Devices** accept a control value and
+yield an environmental output.  The **environment** accepts the new output and
+produces a new measure for the controller.
+
+It's worth noting that a control loop may include multiple controllers feeding
+one another as well as multiple devices.  And the environment may affect
+different stages of the control loop in different ways.
 
 ```ruby
 module Updateable
