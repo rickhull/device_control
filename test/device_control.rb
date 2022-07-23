@@ -1,6 +1,8 @@
 require 'device_control'
 require 'minitest/autorun'
 
+include DeviceControl
+
 # create a basic class that includes Updateable as a Mixin
 # the class should define #initialize, #input= and #output at minimum
 class Doubler
