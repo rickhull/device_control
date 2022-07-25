@@ -247,9 +247,106 @@ temp = 24.9
 So the **heat knob** goes to 1 when its thermostat goes *below* setpoint.
 The **cool knob** goes to 1 when its thermostat goes *above* setpoint.
 
+#### Stateful Controller
+
+Now let's make a more sophisticated controller that has a notion of time
+as well as tracking its error over time.
+
+```ruby
+class StatefulController < Controller
+  HZ = 1000
+  TICK = Rational(1) / HZ
+
+  attr_accessor :dt
+  attr_reader :error, :last_error, :sum_error
+
+  def initialize(setpoint, dt: TICK)
+    super(setpoint)
+    @dt = dt
+    @error, @last_error, @sum_error = 0.0, 0.0, 0.0
+  end
+
+  # update @error, @last_error, and @sum_error
+  def input=(val)
+    @measure = val
+    @last_error = @error
+    @error = @setpoint - @measure
+    if @error * @last_error <= 0  # zero crossing; reset the accumulated error
+      @sum_error = @error * @dt
+    else
+      @sum_error += @error * @dt
+    end
+  end
+
+  def to_s
+    [super,
+     format("Error: %+.3f\tLast: %+.3f\tSum: %+.3f",
+            @error, @last_error, @sum_error),
+    ].join("\n")
+  end
+end
+```
+
+For a notion of time, we will make a timeslice or a tick (or dt), with 1000
+ticks per second.  We'll have ivars for the current error, last error, and
+accumulated error.  On a new measure, set the last error to the current error,
+set the new error, and accumulate the error by the timeslice.
+
+Note that, so far, we aren't doing anything useful with this information.
+
+#### PID Controller
+
+```ruby
+class PIDController < StatefulController
+  attr_accessor :kp, :ki, :kd, :p_range, :i_range, :d_range, :o_range
+
+  def initialize(setpoint, dt: TICK)
+    super
+
+    # gain / multipliers for PID; tunables
+    @kp, @ki, @kd = 1.0, 1.0, 1.0
+
+    # optional clamps for PID terms and output
+    @p_range = (-Float::INFINITY..Float::INFINITY)
+    @i_range = (-Float::INFINITY..Float::INFINITY)
+    @d_range = (-Float::INFINITY..Float::INFINITY)
+    @o_range = (-Float::INFINITY..Float::INFINITY)
+
+    yield self if block_given?
+  end
+
+  def output
+    (self.proportion +
+     self.integral +
+     self.derivative).clamp(@o_range.begin, @o_range.end)
+  end
+
+  def proportion
+    (@kp * @error).clamp(@p_range.begin, @p_range.end)
+  end
+
+  def integral
+    (@ki * @sum_error).clamp(@i_range.begin, @i_range.end)
+  end
+
+  def derivative
+    (@kd * (@error - @last_error) / @dt).clamp(@d_range.begin, @d_range.end)
+  end
+
+  def to_s
+    [super,
+     format(" Gain:\t%.3f\t%.3f\t%.3f",
+            @kp, @ki, @kd),
+     format("  PID:\t%+.3f\t%+.3f\t%+.3f\t= %.5f",
+            self.proportion, self.integral, self.derivative, self.output),
+    ].join("\n")
+  end
+end
+```
+
 # Finale
 
 If you've made it this far, congratulations!  For further reading:
 
-* [lib/device_control.rb](lib/device_control.rb#L155)
+* [lib/device_control.rb](lib/device_control.rb)
 * [test/device_control.rb](test/device_control.rb)
