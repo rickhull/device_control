@@ -219,11 +219,10 @@ class Thermostat < Controller
 end
 ```
 
-Notice, the thermostat essentially answers the question: *is it hot enough?*
-(or: *is it too cold?*).  You can run it either or both ways, but notice that
-you can simply pick one orientation and remain logically consistent.
-
-Now consider:
+Notice, this thermostat essentially answers the question: *is it hot enough?*
+(or equivalently: *is it too cold?*).  You can run it either or both ways,
+but note that you can simply pick one orientation and remain logically
+consistent; consider:
 
 ```ruby
 
