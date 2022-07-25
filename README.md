@@ -205,7 +205,8 @@ end
 ```
 
 A Controller names its input `measure`, and it introduces a `setpoint`, and
-the difference between setpoint and measure is the error.
+the difference between setpoint and measure is the error. For now, just output
+the error.
 
 #### Thermostat
 
