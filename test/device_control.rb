@@ -125,29 +125,6 @@ describe Thermostat do
 end
 
 describe PIDController do
-  it "tracks error, last_error, sum_error" do
-    sc = PIDController.new(100)
-    expect(sc.error).must_equal 0.0
-    expect(sc.last_error).must_equal 0.0
-    expect(sc.sum_error).must_equal 0.0
-
-    output = sc.update 50
-    expect(sc.output).must_equal output
-    expect(sc.measure).must_equal 50
-    expect(sc.error).must_be_within_epsilon 50.0
-    expect(sc.last_error).must_equal 0.0
-    expect(sc.sum_error).must_be_within_epsilon(50.0 * sc.dt)
-
-    output = sc.update 75
-    expect(sc.output).must_equal output
-    expect(sc.measure).must_equal 75
-    expect(sc.error).must_be_within_epsilon 25.0
-    expect(sc.last_error).must_be_within_epsilon 50.0
-    expect(sc.sum_error).must_be_within_epsilon(75.0 * sc.dt)
-  end
-end
-
-describe PIDController do
   it "informs Ziegler-Nichols tuning" do
     # P only, not PID
     hsh = PIDController.tune('P', 5, 0.01)
@@ -177,6 +154,27 @@ describe PIDController do
     expect(pid).must_be_kind_of PIDController
     expect(pid.setpoint).must_equal 1000
     expect(pid.dt).must_equal 0.1
+  end
+
+  it "tracks error, last_error, sum_error" do
+    pid = PIDController.new(100)
+    expect(pid.error).must_equal 0.0
+    expect(pid.last_error).must_equal 0.0
+    expect(pid.sum_error).must_equal 0.0
+
+    output = pid.update 50
+    expect(pid.output).must_equal output
+    expect(pid.measure).must_equal 50
+    expect(pid.error).must_be_within_epsilon 50.0
+    expect(pid.last_error).must_equal 0.0
+    expect(pid.sum_error).must_be_within_epsilon(50.0 * pid.dt)
+
+    output = pid.update 75
+    expect(pid.output).must_equal output
+    expect(pid.measure).must_equal 75
+    expect(pid.error).must_be_within_epsilon 25.0
+    expect(pid.last_error).must_be_within_epsilon 50.0
+    expect(pid.sum_error).must_be_within_epsilon(75.0 * pid.dt)
   end
 
   it "has PID gain settings" do
