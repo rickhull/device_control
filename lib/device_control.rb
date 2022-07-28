@@ -265,28 +265,29 @@ module DeviceControl
   class MovingAverage
     include Updateable
 
-    def initialize(count = 2)
-      @count = count
+    def initialize(size = 2)
+      @size = size
       @idx = 0
-      @storage = Array.new(@count, 0)
+      @storage = Array.new(@size, 0)
     end
 
     def input=(val)
-      @storage[@idx % @count] = val
+      @storage[@idx % @size] = val
       @idx += 1
     end
 
     def output
-      @storage.sum / @count.to_f
+      return 0 if @idx == 0
+      @storage.sum / (@idx > @size ? @size : @idx).to_f
     end
   end
 
   class RateLimiter
     include Updateable
 
-    def initialize(max_step:)
+    def initialize(max_step)
       @max_step = max_step
-      @val = 0.0
+      @val = 0
     end
 
     def input=(val)
