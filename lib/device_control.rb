@@ -228,12 +228,14 @@ module DeviceControl
       @error = @setpoint - @measure
       @sum_error =
         (@sum_error + @ki * @error * @dt).clamp(@e_range.begin, @e_range.end)
+      @mavg.input = self.derivative if @mavg
     end
 
     def output
+      drv = @mavg ? @mavg.output : self.derivative
       (self.proportion +
        self.integral +
-       self.derivative).clamp(@o_range.begin, @o_range.end)
+       drv).clamp(@o_range.begin, @o_range.end)
     end
 
     def proportion
@@ -245,9 +247,7 @@ module DeviceControl
     end
 
     def derivative
-      val = (@kd * (@error - @last_error) / @dt).clamp(@d_range.begin,
-                                                       @d_range.end)
-      @mavg ? @mavg.update(val) : val
+      (@kd * (@error - @last_error) / @dt).clamp(@d_range.begin, @d_range.end)
     end
 
     def to_s
