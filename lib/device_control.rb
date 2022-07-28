@@ -113,6 +113,18 @@ module DeviceControl
     end
   end
 
+  # now consider e.g.
+  # h = Heater.new(1000)
+  # ht = Thermostat.new(20)
+  # c = Cooler.new(1000)
+  # ct = Thermostat.new(25)
+  # temp = 26.4
+  # heat_knob = ht.update(temp) ? 1 : 0
+  # heating_watts = h.update(heat_knob)
+  # cool_knob = ct.update(temp) ? 0 : 1
+  # cooling_watts = c.update(cool_knob)
+  # etc
+
   class Flexstat < Thermostat
     def self.cold_val(hot_val)
       case hot_val
@@ -139,60 +151,17 @@ module DeviceControl
     end
   end
 
-  # now consider e.g.
-  # h = Heater.new(1000)
-  # ht = Thermostat.new(20)
-  # c = Cooler.new(1000)
-  # ct = Thermostat.new(25)
-  # temp = 26.4
-  # heat_knob = ht.update(temp) ? 1 : 0
-  # heating_watts = h.update(heat_knob)
-  # cool_knob = ct.update(temp) ? 0 : 1
-  # cooling_watts = c.update(cool_knob)
-  # etc
-
-  # A StatefulController tracks its error over time: current, last, accumulated
+  # A PIDController is a Controller that tracks its error over time
+  # in order to calculate:
+  #   Proportion (current error)
+  #   Integral   (accumulated error)
+  #   Derivative (error slope, last_error)
+  # The sum of these terms is the output
   #
-  class StatefulController < Controller
+  class PIDController < Controller
     HZ = 1000
     TICK = Rational(1) / HZ
 
-    attr_accessor :dt
-    attr_reader :error, :last_error, :sum_error
-
-    def initialize(setpoint, dt: TICK)
-      super(setpoint)
-      @dt = dt
-      @error, @last_error, @sum_error = 0.0, 0.0, 0.0
-    end
-
-    # update @error, @last_error, and @sum_error
-    def input=(val)
-      @measure = val
-      @last_error = @error
-      @error = @setpoint - @measure
-      if @error * @last_error <= 0  # zero crossing; reset the accumulated error
-        @sum_error = @error * @dt
-      else
-        @sum_error += @error * @dt
-      end
-    end
-
-    def to_s
-      [super,
-       format("Error: %+.3f\tLast: %+.3f\tSum: %+.3f",
-              @error, @last_error, @sum_error),
-      ].join("\n")
-    end
-  end
-
-  # A PIDController is a StatefulController that calculates
-  # * Proportion (current error)
-  # * Integral   (accumulated error)
-  # * Derivative (error slope, last_error)
-  # The sum of these terms is the output
-  #
-  class PIDController < StatefulController
     # Ziegler-Nichols method for tuning PID gain knobs
     # https://en.wikipedia.org/wiki/Ziegler%E2%80%93Nichols_method
     ZN = {
@@ -222,10 +191,22 @@ module DeviceControl
       { kp: kp, ti: ti, td: td, ki: ki, kd: kd }
     end
 
-    attr_accessor :kp, :ki, :kd, :p_range, :i_range, :d_range, :o_range
+    attr_accessor :dt, :low_pass_ticks,
+                  :error, :last_error, :sum_error,
+                  :kp, :ki, :kd,
+                  :p_range, :i_range, :d_range, :o_range, :e_range
+    attr_reader :mavg
 
-    def initialize(setpoint, dt: TICK)
-      super
+
+    def initialize(setpoint, dt: TICK, low_pass_ticks: 0)
+      super(setpoint)
+      @dt = dt
+      @error, @last_error, @sum_error = 0.0, 0.0, 0.0
+      if low_pass_ticks > 0
+        @mavg = MovingAverage.new(low_pass_ticks)
+      else
+        @mavg = nil
+      end
 
       # gain / multipliers for PID; tunables
       @kp, @ki, @kd = 1.0, 1.0, 1.0
@@ -235,8 +216,18 @@ module DeviceControl
       @i_range = (-Float::INFINITY..Float::INFINITY)
       @d_range = (-Float::INFINITY..Float::INFINITY)
       @o_range = (-Float::INFINITY..Float::INFINITY)
+      @e_range = (-Float::INFINITY..Float::INFINITY)
 
       yield self if block_given?
+    end
+
+    # update @error, @last_error, and @sum_error
+    def input=(val)
+      @measure = val
+      @last_error = @error
+      @error = @setpoint - @measure
+      @sum_error =
+        (@sum_error + @ki * @error * @dt).clamp(@e_range.begin, @e_range.end)
     end
 
     def output
@@ -250,15 +241,19 @@ module DeviceControl
     end
 
     def integral
-      (@ki * @sum_error).clamp(@i_range.begin, @i_range.end)
+      @sum_error.clamp(@i_range.begin, @i_range.end)
     end
 
     def derivative
-      (@kd * (@error - @last_error) / @dt).clamp(@d_range.begin, @d_range.end)
+      val = (@kd * (@error - @last_error) / @dt).clamp(@d_range.begin,
+                                                       @d_range.end)
+      @mavg ? @mavg.update(val) : val
     end
 
     def to_s
       [super,
+       format("Error: %+.3f\tLast: %+.3f\tSum: %+.3f",
+              @error, @last_error, @sum_error),
        format(" Gain:\t%.3f\t%.3f\t%.3f",
               @kp, @ki, @kd),
        format("  PID:\t%+.3f\t%+.3f\t%+.3f\t= %.5f",
@@ -267,7 +262,26 @@ module DeviceControl
     end
   end
 
-  class Smoother
+  class MovingAverage
+    include Updateable
+
+    def initialize(count = 2)
+      @count = count
+      @idx = 0
+      @storage = Array.new(@count, 0)
+    end
+
+    def input=(val)
+      @storage[@idx % @count] = val
+      @idx += 1
+    end
+
+    def output
+      @storage.sum / @count.to_f
+    end
+  end
+
+  class RateLimiter
     include Updateable
 
     def initialize(max_step:)

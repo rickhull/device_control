@@ -124,9 +124,9 @@ describe Thermostat do
   end
 end
 
-describe StatefulController do
+describe PIDController do
   it "tracks error, last_error, sum_error" do
-    sc = StatefulController.new(100)
+    sc = PIDController.new(100)
     expect(sc.error).must_equal 0.0
     expect(sc.last_error).must_equal 0.0
     expect(sc.sum_error).must_equal 0.0
@@ -144,16 +144,6 @@ describe StatefulController do
     expect(sc.error).must_be_within_epsilon 25.0
     expect(sc.last_error).must_be_within_epsilon 50.0
     expect(sc.sum_error).must_be_within_epsilon(75.0 * sc.dt)
-  end
-
-  it "resets sum_error after crossing setpoint" do
-    sc = StatefulController.new(100)
-    sc.update 50
-    sc.update 75
-    expect(sc.sum_error).must_be_within_epsilon(75.0 * sc.dt)
-    sc.update 125
-    expect(sc.error).must_equal(-25.0)
-    expect(sc.sum_error).must_equal(sc.error * sc.dt)
   end
 end
 
@@ -217,6 +207,7 @@ describe PIDController do
     expect(pid.integral).must_equal 1.0
     pid.update(10_001)
     pid.update(20_000)
+    pid.update(30_000)
     expect(pid.integral).must_equal(-1.0)
   end
 
@@ -256,13 +247,15 @@ describe PIDController do
   it "calculates _integral_ based on accumulated error" do
     pid = PIDController.new(1000)
     pid.ki = 1.0
-    pid.update(0)
-    # sum error should be 1000; dt is 0.001
+
+    pid.update(0) # error is 1000; dt is 0.001
     expect(pid.integral).must_equal(1.0)
-    pid.update(999)
+
+    pid.update(999) # error is 1, sum_error is 1.001
     expect(pid.integral).must_be_within_epsilon(1.001)
-    pid.update(1100) # zero crossing
-    expect(pid.integral).must_be_within_epsilon(-0.1)
+
+    pid.update(1100) # error is -100, sum_error is 0.901
+    expect(pid.integral).must_be_within_epsilon(0.901)
   end
 
   it "calculates _derivative_ based on error slope" do
