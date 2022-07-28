@@ -231,6 +231,19 @@ describe PIDController do
     expect(pid.output).must_equal(0.0)
   end
 
+  it "clamps _sum_error_" do
+    pid = PIDController.new(1000)
+    pid.e_range = 999..1000
+
+    pid.update(500)
+    expect(pid.error).must_equal 500
+    expect(pid.sum_error).must_equal 999
+    pid.update(1000)
+    expect(pid.sum_error).must_equal 999
+    pid.update(-1000)
+    expect(pid.sum_error).must_equal 1000
+  end
+
   it "calculates _proportion_ based on current error" do
     pid = PIDController.new(1000)
     pid.kp = 1.0
@@ -260,17 +273,68 @@ describe PIDController do
     pid = PIDController.new(1000)
     pid.kp = 1.0
     pid.update(0)
-    # error should be 1000; last_error 0
-    expect(pid.derivative).must_equal(1_000_000)
+    expect(pid.error).must_equal 1000
+    expect(pid.last_error).must_equal 0
+    expect(pid.derivative).must_be_within_epsilon(1000 / pid.dt)
+
     pid.update(500)
-    expect(pid.derivative).must_equal(-500_000)
+    expect(pid.error).must_equal 500
+    expect(pid.last_error).must_equal 1000
+    expect(pid.derivative).must_be_within_epsilon(-500 / pid.dt)
+
     pid.update(999)
-    expect(pid.derivative).must_equal(-499_000)
+    expect(pid.error).must_equal 1
+    expect(pid.last_error).must_equal 500
+    expect(pid.derivative).must_be_within_epsilon(-499 / pid.dt)
+
     pid.update(1001)
-    expect(pid.derivative).must_equal(-2000)
+    expect(pid.error).must_equal(-1)
+    expect(pid.last_error).must_equal(1)
+    expect(pid.derivative).must_be_within_epsilon(-2 / pid.dt)
+
     pid.update(1100)
-    expect(pid.derivative).must_equal(-99_000)
+    expect(pid.error).must_equal(-100)
+    expect(pid.last_error).must_equal(-1)
+    expect(pid.derivative).must_be_within_epsilon(-99 / pid.dt)
+
     pid.update(900)
-    expect(pid.derivative).must_equal(200_000)
+    expect(pid.error).must_equal(100)
+    expect(pid.last_error).must_equal(-100)
+    expect(pid.derivative).must_be_within_epsilon(200 / pid.dt)
+  end
+
+  it "has an optional LPF on the _derivative_ term at _output_" do
+    pid = PIDController.new(1000, low_pass_ticks: 2)
+    pid.kp = 1.0
+
+    pid.update(0) # error should be 1000; last_error 0 (1000)
+    expect(pid.error).must_be_within_epsilon(1000)
+    expect(pid.last_error).must_equal 0
+    expect(pid.derivative).must_be_within_epsilon(1000 / pid.dt)
+
+    pid.update(500) # error 500, last_error 1000 (-500)
+    expect(pid.error).must_equal 500
+    expect(pid.last_error).must_equal 1000
+    expect(pid.derivative).must_be_within_epsilon(-500 / pid.dt)
+
+    pid.update(999)
+    expect(pid.error).must_equal 1
+    expect(pid.last_error).must_equal 500
+    expect(pid.derivative).must_be_within_epsilon(-499 / pid.dt)
+
+    pid.update(1001)
+    expect(pid.error).must_equal(-1)
+    expect(pid.last_error).must_equal(1)
+    expect(pid.derivative).must_be_within_epsilon(-2 / pid.dt)
+
+    pid.update(1100)
+    expect(pid.error).must_equal(-100)
+    expect(pid.last_error).must_equal(-1)
+    expect(pid.derivative).must_be_within_epsilon(-99 / pid.dt)
+
+    pid.update(900)
+    expect(pid.error).must_equal(100)
+    expect(pid.last_error).must_equal(-100)
+    expect(pid.derivative).must_be_within_epsilon(200 / pid.dt)
   end
 end
