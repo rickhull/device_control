@@ -229,8 +229,13 @@ module DeviceControl
       @measure = val
       @last_error = @error
       @error = @setpoint - @measure
+      # Incorporate @ki here for better behavior when @ki is updated
+      # It's a good idea to clamp the accumulated error so that if we start
+      #   way under setpoint, we don't accumulate so much error that we spend
+      #   too much time overshooting to counteract it
       @sum_error =
         (@sum_error + @ki * @error * @dt).clamp(@e_range.begin, @e_range.end)
+      # update mavg here to ensure only one update per PID input
       @mavg.input = self.derivative if @mavg
     end
 
@@ -245,6 +250,10 @@ module DeviceControl
       (@kp * @error).clamp(@p_range.begin, @p_range.end)
     end
 
+    # It may seem funny to clamp both @sum_error and the integral term, but
+    #   we may want different values for these clamps.  @e_range is just to
+    #   make sure we don't create a mountain to chew through.  @i_range gives
+    #   additional flexibility for balancing P I & D
     def integral
       @sum_error.clamp(@i_range.begin, @i_range.end)
     end
@@ -274,6 +283,7 @@ module DeviceControl
       @storage = Array.new(@size, 0)
     end
 
+    # never grow @storage; just use modmath to track what to replace
     def input=(val)
       @storage[@idx % @size] = val
       @idx += 1
@@ -293,6 +303,7 @@ module DeviceControl
       @val = 0
     end
 
+    # never allow @val to grow / shrink more than @max_step
     def input=(val)
       diff = val - @val
       @val += diff.clamp(-1 * @max_step, @max_step)
