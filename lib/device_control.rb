@@ -300,9 +300,11 @@ module DeviceControl
   class RateLimiter
     include Updateable
 
-    def initialize(max_step)
+    attr_accessor :val
+
+    def initialize(max_step, val: 0)
       @max_step = max_step
-      @val = 0
+      @val = val
     end
 
     # never allow @val to grow / shrink more than @max_step
