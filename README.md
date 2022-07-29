@@ -248,9 +248,45 @@ temp = 24.9
 So the **heat knob** goes to 1 when its thermostat goes *below* setpoint.
 The **cool knob** goes to 1 when its thermostat goes *above* setpoint.
 
+#### Flexstat
+
+If we really need a flexible thermostat in terms of output values, consider:
+
+```ruby
+class Flexstat < Thermostat
+  def self.cold_val(hot_val)
+    case hot_val
+    when true, false
+      !hot_val
+    when 0,1
+      hot_val == 0 ? 1 : 0
+    when Numeric
+      0
+    when :on, :off
+      hot_val == :on ? :off : :on
+    else
+      raise "#{hot_val.inspect} not recognized"
+    end
+  end
+
+  attr_reader :cold_val, :hot_val
+
+  def initialize(setpoint, hot_val: false, cold_val: nil)
+    super(setpoint)
+
+    @hot_val = hot_val
+    @cold_val = cold_val.nil? ? self.class.cold_val(hot_val) : cold_val
+  end
+
+  def output
+    super ? @cold_val : @hot_val
+  end
+end
+```
+
 # Finale
 
 If you've made it this far, congratulations!  For further reading:
 
-* [lib/device_control.rb](lib/device_control.rb)
+* [lib/device_control.rb](lib/device_control.rb#L165)
 * [test/device_control.rb](test/device_control.rb)
