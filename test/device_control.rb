@@ -144,6 +144,7 @@ describe Thermostat do
       expect(Flexstat.cold_val 99.876).must_equal 0
       expect(Flexstat.cold_val :on).must_equal :off
       expect(Flexstat.cold_val :off).must_equal :on
+
       expect { Flexstat.cold_val 'on' }.must_raise
       expect { Flexstat.cold_val :anything_else }.must_raise
     end
