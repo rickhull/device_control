@@ -20,12 +20,12 @@ class Doubler
 end
 
 describe Updateable do
-  describe "a mixin that provides the _update_ pattern" do
+  describe "a mixin that provides an 'update' pattern" do
     before do
       @o = Doubler.new
     end
 
-    it "has an _update_ method that accepts an _input_ and returns _output_" do
+    it "has an update method that accepts an input and returns output" do
       expect(@o.input).must_equal 0.0
       expect(@o.output).must_equal 0.0
 
@@ -34,7 +34,7 @@ describe Updateable do
       expect(@o.output).must_equal output
     end
 
-    it "requires an _output_ method" do
+    it "requires an output method" do
       k = Class.new(Object) do
         include Updateable
       end
@@ -49,7 +49,7 @@ describe Device do
     @device = Device.new
   end
 
-  it "has an _output_" do
+  it "has an output" do
     expect(@device.output).must_be_kind_of Float
   end
 
@@ -57,7 +57,7 @@ describe Device do
     expect(@device.to_s).must_be_kind_of String
   end
 
-  it "has an _update_ method from Updateable" do
+  it "has an update method from Updateable" do
     expect(@device.update(2.34)).must_be_kind_of Float
   end
 end
@@ -67,7 +67,7 @@ describe Heater do
     @h = Heater.new(1000)
   end
 
-  it "has an _output_ when _knob_ is greater than zero" do
+  it "has an output when knob is greater than zero" do
     expect(@h.knob).must_equal 0
     expect(@h.output).must_equal 0
     @h.knob = 1
@@ -78,13 +78,24 @@ describe Heater do
     expect(@h.to_s).must_be_kind_of String
   end
 
-  it "has _update_ from Updateable" do
+  it "has update from Updateable" do
     expect(@h.knob).must_equal 0
     expect(@h.output).must_equal 0
     output = @h.update(1)
     expect(output).must_be :>, 0
     expect(@h.knob).must_equal 1
     expect(@h.output).must_equal output
+  end
+
+  describe Cooler do
+    it "is less efficient than a Heater" do
+      h = Heater.new(1000)
+      c = Cooler.new(1000)
+      h.knob = 1
+      c.knob = 1
+      expect(c.output).must_be :<, h.output
+      expect(c.output).must_be :<, h.output / 2.0
+    end
   end
 end
 
@@ -94,7 +105,7 @@ describe Controller do
     @c = Controller.new(@sp)
   end
 
-  it "has an _output_, the difference between setpoint and measure" do
+  it "has an output_, the difference between setpoint and measure" do
     expect(@c.output).must_be_kind_of Float
     expect(@c.output).must_equal @sp
   end
@@ -103,7 +114,7 @@ describe Controller do
     expect(@c.to_s).must_be_kind_of String
   end
 
-  it "has an _update_ method from Updateable" do
+  it "has an update method from Updateable" do
     expect(@c.update(499)).must_equal 1.0
   end
 end
@@ -121,6 +132,55 @@ describe Thermostat do
   it "outputs false when it's too hot; when measure > setpoint" do
     expect(@t.update 30).must_equal false
     expect(@t.update 20).must_equal true
+  end
+
+  describe Flexstat do
+    it "maps a hot_val to a suitable cold_val" do
+      expect(Flexstat.cold_val true).must_equal false
+      expect(Flexstat.cold_val false).must_equal true
+      expect(Flexstat.cold_val 0).must_equal 1
+      expect(Flexstat.cold_val 1).must_equal 0
+      expect(Flexstat.cold_val 2).must_equal 0
+      expect(Flexstat.cold_val 99.876).must_equal 0
+      expect(Flexstat.cold_val :on).must_equal :off
+      expect(Flexstat.cold_val :off).must_equal :on
+      expect { Flexstat.cold_val 'on' }.must_raise
+      expect { Flexstat.cold_val :anything_else }.must_raise
+    end
+
+    it "has configurable hot/cold values for its output" do
+      f = Flexstat.new(25, hot_val: :on, cold_val: :off)
+      expect(f).must_be_kind_of Flexstat
+      expect(f.hot_val).must_equal :on
+      expect(f.cold_val).must_equal :off
+      expect(f.update 20).must_equal :off
+
+      f = Flexstat.new(25, hot_val: :on)
+      expect(f).must_be_kind_of Flexstat
+      expect(f.hot_val).must_equal :on
+      expect(f.cold_val).must_equal :off
+      expect(f.update 30).must_equal :on
+
+      f = Flexstat.new(25)
+      expect(f).must_be_kind_of Flexstat
+      expect(f.hot_val).must_equal false # default, subject to change
+      expect(f.cold_val).must_equal true # likewise
+      expect(f.cold_val).must_equal Flexstat.cold_val(f.hot_val)
+      expect(f.update 30).must_equal f.hot_val
+
+      f = Flexstat.new(25, hot_val: 7, cold_val: 19)
+      expect(f).must_be_kind_of Flexstat
+      expect(f.hot_val).must_equal 7
+      expect(f.cold_val).must_equal 19
+      expect(f.update 20).must_equal 19
+
+      f = Flexstat.new(25, hot_val: 7)
+      expect(f).must_be_kind_of Flexstat
+      expect(f.hot_val).must_equal 7
+      expect(f.cold_val).must_equal Flexstat.cold_val(f.hot_val)
+      expect(f.cold_val).must_equal 0
+      expect(f.update 30).must_equal 7
+    end
   end
 end
 
@@ -149,7 +209,7 @@ describe PIDController do
     expect(hsh[:td]).must_be :>, 0
   end
 
-  it "has an optional _dt_ argument to initialize" do
+  it "has an optional dt argument to initialize" do
     pid = PIDController.new(1000, dt: 0.1)
     expect(pid).must_be_kind_of PIDController
     expect(pid.setpoint).must_equal 1000
@@ -188,7 +248,7 @@ describe PIDController do
     expect(pid.kd).must_equal 1000
   end
 
-  it "clamps the _proportion_ term" do
+  it "clamps the proportion term" do
     pid = PIDController.new(1000)
     pid.p_range = (0..1)
     pid.update(500)
@@ -197,7 +257,7 @@ describe PIDController do
     expect(pid.proportion).must_equal 0.0
   end
 
-  it "clamps the _integral_ term" do
+  it "clamps the integral term" do
     pid = PIDController.new(1000)
     pid.i_range = (-1.0 .. 1.0)
     pid.setpoint = 10_000
@@ -209,7 +269,7 @@ describe PIDController do
     expect(pid.integral).must_equal(-1.0)
   end
 
-  it "clamps the _derivative_ term" do
+  it "clamps the derivative term" do
     pid = PIDController.new(1000)
     pid.d_range = (-1.0 .. 0.0)
     pid.update(0)
@@ -222,7 +282,7 @@ describe PIDController do
     expect(pid.derivative).must_equal(0.0)
   end
 
-  it "clamps the _output_" do
+  it "clamps the output" do
     pid = PIDController.new(1000)
     pid.o_range = (0.0 .. 1.0)
     pid.update(0)
@@ -231,7 +291,7 @@ describe PIDController do
     expect(pid.output).must_equal(0.0)
   end
 
-  it "clamps _sum_error_" do
+  it "clamps sum_error" do
     pid = PIDController.new(1000)
     pid.e_range = 999..1000
 
@@ -244,7 +304,7 @@ describe PIDController do
     expect(pid.sum_error).must_equal 1000
   end
 
-  it "calculates _proportion_ based on current error" do
+  it "calculates proportion based on current error" do
     pid = PIDController.new(1000)
     pid.kp = 1.0
     pid.update(0)
@@ -255,7 +315,7 @@ describe PIDController do
     expect(pid.proportion).must_equal(-1.0)
   end
 
-  it "calculates _integral_ based on accumulated error" do
+  it "calculates integral based on accumulated error" do
     pid = PIDController.new(1000)
     pid.ki = 1.0
 
@@ -269,7 +329,7 @@ describe PIDController do
     expect(pid.integral).must_be_within_epsilon(0.901)
   end
 
-  it "calculates _derivative_ based on error slope" do
+  it "calculates derivative based on error slope" do
     pid = PIDController.new(1000)
     pid.kp = 1.0
     pid.update(0)
@@ -303,7 +363,7 @@ describe PIDController do
     expect(pid.derivative).must_be_within_epsilon(200 / pid.dt)
   end
 
-  it "has an optional LPF on the _derivative_ term at _output_" do
+  it "has an optional LPF on the derivative term at output" do
     pid = PIDController.new(1000, low_pass_ticks: 2)
     pid.kp = 1.0
 
@@ -336,5 +396,49 @@ describe PIDController do
     expect(pid.error).must_equal(100)
     expect(pid.last_error).must_equal(-100)
     expect(pid.derivative).must_be_within_epsilon(200 / pid.dt)
+  end
+
+  describe MovingAverage do
+    it "has a configurable number of items to consider for the average" do
+      mavg = MovingAverage.new(5)
+      expect(mavg.output).must_equal 0
+      expect(mavg.update 10).must_equal 10
+      expect(mavg.update 20).must_equal 15
+      expect(mavg.update 30).must_equal 20
+      expect(mavg.update 20).must_equal 20
+      expect(mavg.update 20).must_equal 20
+
+      # 10 is about to drop; replace it to maintain 20
+      expect(mavg.update 10).must_equal 20
+
+      # 20 is about to drop; replace it
+      expect(mavg.update 20).must_equal 20
+
+      # 30 is about to drop; replace it
+      expect(mavg.update 30).must_equal 20
+
+      # 20 is about to drop; replace with 0
+      expect(mavg.update 0).must_equal 16
+    end
+  end
+
+  describe RateLimiter do
+    it "has a configurable step size per tick" do
+      rl = RateLimiter.new(10)
+
+      expect(rl.update 5).must_equal 5
+      expect(rl.update 15).must_equal 15
+
+      # now at 15, attempt 30; limited to 25
+      expect(rl.update 30).must_equal 25
+
+      # now at 25, attempt 0; limited to 15
+      expect(rl.update 0).must_equal 15
+
+      rl = RateLimiter.new(0.1)
+      expect(rl.output).must_equal 0
+      expect(rl.update 5).must_be_within_epsilon 0.1
+      expect(rl.update 15).must_be_within_epsilon 0.2
+    end
   end
 end

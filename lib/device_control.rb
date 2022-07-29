@@ -141,7 +141,11 @@ module DeviceControl
       end
     end
 
-    def initalize(hot_val: false, cold_val: nil)
+    attr_reader :cold_val, :hot_val
+
+    def initialize(setpoint, hot_val: false, cold_val: nil)
+      super(setpoint)
+
       @hot_val = hot_val
       @cold_val = cold_val.nil? ? self.class.cold_val(hot_val) : cold_val
     end
