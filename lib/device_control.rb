@@ -277,6 +277,8 @@ module DeviceControl
   class MovingAverage
     include Updateable
 
+    attr_reader :size, :idx, :storage
+
     def initialize(size = 2)
       @size = size
       @idx = 0
