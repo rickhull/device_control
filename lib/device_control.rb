@@ -201,7 +201,6 @@ module DeviceControl
                   :p_range, :i_range, :d_range, :o_range, :e_range
     attr_reader :mavg
 
-
     def initialize(setpoint, dt: TICK, low_pass_ticks: 0)
       super(setpoint)
       @dt = dt
