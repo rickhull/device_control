@@ -1,6 +1,6 @@
 Gem::Specification.new do |s|
   s.name = 'device_control'
-  s.summary = "WIP"
+  s.summary = "PID controllers, etc"
   s.description = "WIP"
   s.authors = ["Rick Hull"]
   s.homepage = "https://github.com/rickhull/device_control"
